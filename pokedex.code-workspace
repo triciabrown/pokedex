@@ -1,0 +1,11 @@
+{
+	"folders": [
+		{
+			"name": "pokedex",
+			"path": "."
+		}
+	],
+	"settings": {
+		"liveServer.settings.multiRootWorkspaceName": "pokedex"
+	}
+}
