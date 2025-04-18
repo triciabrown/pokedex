@@ -1,16 +1,62 @@
-const MAX_POKEMON = 151;
+const MAX_POKEMON = 500;
 const listWrapper = document.querySelector(".list-wrapper");
 const searchInput = document.querySelector("#search-input");
 const numberFilter = document.querySelector("#number");
 const nameFilter = document.querySelector("#name");
+const typeFilter = document.querySelector("#type");
+const typeSelector = document.querySelector("#type-selector");
+const pokemonTypeSelect = document.querySelector("#pokemon-type");
 const notFoundMessage = document.querySelector("#not-found-message");
 
 let allPokemons = [];
+let pokemonDetailsCache = {};
 
+//toggle type selector visibility when type filter is selected
+typeFilter.addEventListener("change", function() {
+    if (this.checked) {
+        typeSelector.style.display = "block";
+    } else {
+        typeSelector.style.display = "none";
+    }
+});
+
+// Add event listeners for search filter changes
+nameFilter.addEventListener("change", function() {
+    if (this.checked) {
+        typeSelector.style.display = "none";
+    }
+});
+
+numberFilter.addEventListener("change", function() {
+    if (this.checked) {
+        typeSelector.style.display = "none";
+    }
+});
+
+pokemonTypeSelect.addEventListener("change", handleSearch);
+
+//fetch all Pokemon and their details
 fetch(`https://pokeapi.co/api/v2/pokemon?limit=${MAX_POKEMON}`)
   .then((response) => response.json())
-  .then((data) => {
+  .then(async (data) => {
     allPokemons = data.results;
+    
+    //for each Pokemon fetch its detailed information including types
+    const pokemonDetailsPromises = allPokemons.map(pokemon => {
+        const pokemonID = pokemon.url.split("/")[6];
+        return fetch(`https://pokeapi.co/api/v2/pokemon/${pokemonID}`)
+            .then(res => res.json())
+            .then(details => {
+                //cache the details for later use
+                pokemonDetailsCache[pokemonID] = {
+                    types: details.types.map(t => t.type.name)
+                };
+                return pokemon;
+            });
+    });
+    
+    //wait for all details to be fetched
+    await Promise.all(pokemonDetailsPromises);
     displayPokemons(allPokemons);
   });
 
@@ -37,6 +83,10 @@ function displayPokemons(pokemon) {
     const pokemonID = pokemon.url.split("/")[6];
     const listItem = document.createElement("div");
     listItem.className = "list-item";
+    
+    //get types for this Pokemon if available in cache
+    const pokemonTypes = pokemonDetailsCache[pokemonID]?.types || [];
+    
     listItem.innerHTML = `
         <div class="number-wrap">
             <p class="caption-fonts">#${pokemonID}</p>
@@ -45,7 +95,10 @@ function displayPokemons(pokemon) {
             <img src="https://raw.githubusercontent.com/pokeapi/sprites/master/sprites/pokemon/other/dream-world/${pokemonID}.svg" alt="${pokemon.name}" />
         </div>
         <div class="name-wrap">
-            <p class="body3-fonts">#${pokemon.name}</p>
+            <p class="body3-fonts">${pokemon.name}</p>
+            <div class="types-mini">
+                ${pokemonTypes.map(type => `<span class="type-tag ${type}">${type}</span>`).join('')}
+            </div>
         </div>
     `;
 
@@ -75,6 +128,17 @@ function handleSearch() {
     filteredPokemons = allPokemons.filter((pokemon) =>
       pokemon.name.toLowerCase().startsWith(searchTerm)
     );
+  } else if (typeFilter.checked) {
+    const selectedType = pokemonTypeSelect.value.toLowerCase();
+    if (!selectedType) {
+      filteredPokemons = allPokemons; // Show all if no type selected
+    } else {
+      filteredPokemons = allPokemons.filter((pokemon) => {
+        const pokemonID = pokemon.url.split("/")[6];
+        const types = pokemonDetailsCache[pokemonID]?.types || [];
+        return types.includes(selectedType);
+      });
+    }
   } else {
     filteredPokemons = allPokemons;
   }
